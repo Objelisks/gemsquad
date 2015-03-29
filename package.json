@@ -1,0 +1,27 @@
+{
+  "name": "gemsquad",
+  "version": "1.0.0",
+  "description": "#gemsquad",
+  "main": "index.html",
+  "dependencies": {
+    "connect": "^3.3.4",
+    "serve-static": "^1.9.2"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Objelisks/gemsquad.git"
+  },
+  "keywords": [
+    "gems"
+  ],
+  "author": "objelisks",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Objelisks/gemsquad/issues"
+  }
+}

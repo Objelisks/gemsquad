@@ -1,0 +1,11 @@
+uniform float time;
+
+varying float ptSize;
+
+void main() {
+	vec3 animPos = position + vec3(cos(time/5.0+position.x)/3.0, time/10.0, sin(time/5.0+position.z)/5.0);
+	animPos.y = mod(animPos.y, 5.0);
+	gl_PointSize = 10.0 - pow(length(cameraPosition-animPos), 2.0);
+	ptSize = gl_PointSize;
+	gl_Position = projectionMatrix * modelViewMatrix * vec4(animPos, 1.0);
+}
