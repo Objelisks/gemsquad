@@ -1,0 +1,25 @@
+uniform vec3 players[4];
+uniform int playerCount;
+
+varying vec3 vPos;
+
+
+void main() {
+	vec3 playerColors[4];
+	playerColors[0] = vec3(1, 0, 0);
+	playerColors[1] = vec3(0, 1, 0);
+	playerColors[2] = vec3(0, 0, 1);
+	playerColors[3] = vec3(1, 1, 0);
+
+	float minD = 100000.0;
+	gl_FragColor = vec4(1.0);
+	for(int i = 0; i < 4; i++) {
+		vec3 p = players[i];
+		float d = length(vPos - vec3(p.x, -p.z, p.y));
+		if(d < minD) {
+			gl_FragColor = vec4(playerColors[i], 1.0);
+			minD = d;
+		}
+	}
+
+}

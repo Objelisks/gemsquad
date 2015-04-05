@@ -5,6 +5,7 @@ define(function(require) {
 	var player = require('player');
 	var networked = require('network');
 	var particles = require('particles');
+	var camera = require('camera');
 
 	// entities needs to be visible to update loop and setup
 	var entities = [];
@@ -37,11 +38,11 @@ define(function(require) {
 			var dust = new entity().of([particles.dust]);
 			world.addUpdate(dust);
 
-			var ground = new entity().of([terrain]);
-			world.add(ground);
+			world.terrain = new terrain(world.camera);
 
-			var p1 = new entity(true).of([input, player, networked.sender]);
+			var p1 = new entity(true).of([input, player, camera, networked.sender]);
 			world.addUpdate(p1);
+			world.player = p1;
 
 		}
 	};

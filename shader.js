@@ -6,9 +6,7 @@ define(function(require) {
 	var loadShader = function(name) {
 		// build shader
 		var shaderMaterial = new THREE.ShaderMaterial({
-			uniforms: {
-				time: uniforms.time
-			},
+			uniforms: uniforms,
 			attributes: {}
 		});
 

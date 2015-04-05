@@ -3,6 +3,8 @@ define(function(require) {
 		scene: null,
 		camera: null,
 		entities: null,
+		player: null,
+		terrain: null,
 		add: function(entity) {
 			world.scene.add(entity);
 		},

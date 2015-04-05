@@ -27,7 +27,7 @@ define(function(require) {
 
 	// TODO: set up actual host
 	// TODO: probably needs a auto restart script
-	var connectionServerUrl = 'http://localhost:3000';
+	var connectionServerUrl = 'http://objelisks.rocks:44668';
 
 	/*
 		api for talking to the connection server
@@ -199,10 +199,14 @@ define(function(require) {
 	var attemptConnect = function() {
 		if(peers.length < 1) {
 			connectionServer.getId(function(id) {
-				console.log('connecting to', id);
-				var conn = peerjs.connect(id);
-				// TODO: handle error
-				handleConnection(conn);
+				if(id === 'noid') {
+					return;
+				} else {
+					console.log('connecting to', id);
+					var conn = peerjs.connect(id);
+					// TODO: handle error
+					handleConnection(conn);
+				}
 			});
 		}
 	}
@@ -216,7 +220,7 @@ define(function(require) {
 
 		connectionServer.heartbeat();
 
-		setInterval(connectionServer.heartbeat, 1000/30);
+		setInterval(connectionServer.heartbeat, 1000/2);
 		setInterval(attemptConnect, 1000*10);
 	});
 
