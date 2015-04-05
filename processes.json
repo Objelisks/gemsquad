@@ -1,0 +1,14 @@
+{
+	"apps": [
+		{
+			"name": "gemsquad_file",
+			"script": "server.js",
+			"cwd": "./"
+		},
+		{
+			"name": "gemsquad_peerConn",
+			"script": "peerServer.js",
+			"cwd": "./"
+		}
+	]
+}
