@@ -1,6 +1,6 @@
 define(function(require) {
 
-	var disable = true;
+	var disable = false;
 
 	var socket = disable ? null : io('ws://localhost:5000/');
 	var vars = {};

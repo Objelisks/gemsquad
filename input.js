@@ -2,7 +2,7 @@ define(function(require) {
 	var component = require('component');
 	var keys = new THREEx.KeyboardState();
 
-	var moveSpeed = 1.0;
+	var moveSpeed = 10.0;
 	var clock = new THREE.Clock();
 
 	/*

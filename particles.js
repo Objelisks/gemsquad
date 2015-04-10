@@ -7,8 +7,15 @@ define(function(require) {
 		var points = new THREE.Geometry();
 		var material = shader('shaders/dust');
 
+		var scale = 20.0;
+
 		for (var i = 0; i < 2000; i++) {
-			points.vertices.push(new THREE.Vector3(Math.random() * 10 - 5, Math.random() * 20 - 10, Math.random() * 10 - 5));
+			var pt = new THREE.Vector3(Math.random(), Math.random(), Math.random());
+			for(var x = -1; x <= 1; x++) {
+				for (var y = -1; y <= 1; y++) {
+					points.vertices.push(new THREE.Vector3(x, 0, y).add(pt).multiplyScalar(scale).addScalar(-scale/2.0));
+				}
+			}
 		}
 
 		points.verticesNeedUpdate = true;

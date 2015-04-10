@@ -1,15 +1,22 @@
 uniform float time;
 
 varying float ptSize;
+varying vec3 pos;
+
+const float timeScale = 10.0;
 
 void main() {
-	vec3 localPos = position + cameraPosition;
-	vec3 animPos = position + vec3(cos(time/5.0+position.x)/3.0, time/10.0, sin(time/5.0+position.z)/5.0);
-	animPos -= vec3(0.0, 0.0, 0.0);
-	animPos.y = mod(animPos.y, 5.0);
-	animPos.x = mod(animPos.x, 4.0)+cameraPosition.x;
-	animPos.z = mod(animPos.z, 4.0)+cameraPosition.z;
-	gl_PointSize = 10.0 - pow(length(cameraPosition-animPos), 2.0);
+
+	vec3 animPos = position + vec3(sin(time / timeScale + position.x), time / timeScale, cos(time / timeScale + position.z));
+	//animPos -= vec3(2.0, 2.0, 2.0);
+	animPos.y = mod(animPos.y, 20.0);
+
+	vec3 center = cameraPosition - vec3(0, 2.5, 2.5);
+	float tileWidth = 20.0;
+
+	vec3 finalPos = mod(-center, tileWidth) + animPos + floor(center) + fract(center);
+	gl_PointSize = clamp(10.0 - pow(length(cameraPosition-finalPos), 1.2), 0.0, 10.0);
 	ptSize = gl_PointSize;
-	gl_Position = projectionMatrix * modelViewMatrix * vec4(animPos, 1.0);
+	gl_Position = projectionMatrix * modelViewMatrix * vec4(finalPos, 1.0);
+	pos = finalPos;
 }
