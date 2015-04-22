@@ -8,7 +8,6 @@ define(function(require) {
 	var terrain = function(actualCamera) {
 
 		this.material = shader('shaders/terrain');
-		this.material.uniforms.camera = {type: 'm4', value: actualCamera.matrixWorld };
 		this.material.uniforms.res = {type: '2f', value: new THREE.Vector2(window.innerWidth*.8, window.innerHeight*.8) };
 
 		this.camera = new THREE.OrthographicCamera( -1, 1, 1, -1, 0, 1 );

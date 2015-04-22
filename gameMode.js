@@ -6,6 +6,8 @@ define(function(require) {
 	var networked = require('network');
 	var particles = require('particles');
 	var camera = require('camera');
+	var gem = require('gem');
+	var physicsController = require('physicsController');
 
 	// entities needs to be visible to update loop and setup
 	var entities = [];
@@ -40,9 +42,12 @@ define(function(require) {
 
 			world.terrain = new terrain(world.camera);
 
-			var p1 = new entity(true).of([input, player, camera, networked.sender]);
+			var p1 = new entity().of([input, player, camera, networked.sender]);
 			world.addUpdate(p1);
 			world.player = p1;
+
+			var gem1 = new entity().of([gem, physicsController]);
+			world.addUpdate(gem1);
 
 		}
 	};

@@ -1,0 +1,20 @@
+uniform sampler2D simData;
+uniform float time;
+
+//layout(origin_upper_left) in vec4 gl_FragCoord;
+
+void main() {
+	vec2 iuv = gl_FragCoord.xy;
+	// current value
+	vec4 objPos = texture2D(simData, iuv / 64.);
+	float objWidth = 1.0;
+
+	// sample normal of terrain at projected position
+	// check if collides
+	// fix projected position
+	// add rotating impulse
+
+	vec3 result = objPos.xyz + vec3(0.0,sin(time/10.)-0.2,0.0);
+
+	gl_FragColor = vec4(result, 2.0);
+}

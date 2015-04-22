@@ -9,6 +9,7 @@ define(function(require) {
 	renderer.autoClear = false;
 	renderer.context.getExtension('EXT_frag_depth');
 
+
 	var clock = new THREE.Clock(true);
 
 	var updateUniforms = function() {
@@ -28,6 +29,8 @@ define(function(require) {
 		requestAnimationFrame(render);
 		updateUniforms();
 
+		renderer.setRenderTarget();
+		
 		// clear everything
 		renderer.clear();
 
@@ -52,6 +55,8 @@ define(function(require) {
 			camera.position.z = 2.5;
 			camera.lookAt(new THREE.Vector3(0, 0, 0));
 			world.camera = camera;
-		}
+			uniforms.camera = {type: 'm4', value: camera.matrixWorld };
+		},
+		renderer: renderer
 	};
 })

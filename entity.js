@@ -4,11 +4,10 @@ define(function(require) {
 		entities are extensions of the three js object class
 		mostly they server as containers for components which add functionality
 	*/
-	var entity = function(isActor) {
+	var entity = function() {
 		THREE.Object3D.call(this);
 		this.components = [];
 		this.namedComponents = {};
-		this.acts = !!isActor;
 	}
 
 	entity.prototype = Object.create(THREE.Object3D.prototype);
