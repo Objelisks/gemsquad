@@ -13,7 +13,7 @@ define(function(require) {
 
 		var color = new THREE.Color().setHSL(Math.random(), 0.5, 0.6);
 
-		target.add(new THREE.Mesh(new THREE.PlaneBufferGeometry(2,2), gemShader));
+		this.target.add(new THREE.Mesh(new THREE.PlaneBufferGeometry(2,2), gemShader));
 		//target.add(new THREE.Sprite(gemShader));
 	}
 

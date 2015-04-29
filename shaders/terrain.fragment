@@ -125,18 +125,18 @@ float noise(vec3 p) {
 }
 
 float fbm(vec3 p) {
-  return noise(p + vec3(noise(p) + 50.0*korg[0], noise(p) - time, noise(p) + 20.0*korg[2]));
+  return noise(p + vec3(noise(p) + 50.0, noise(p), noise(p) + 20.0));
 }
 
 float pattern(vec3 p) {
-  p.y += 20.0;
+  p.y += 10.0;
   float distortion = fbm(p * 0.5) / 0.5;
   distortion += fbm(p * 0.25) / 0.25;
   distortion += fbm(p * 0.125) / 0.125;
   distortion += fbm(p * 0.0625) / 0.0625;
 
   vec4 ground = vec4(0, 0.5, 0, 0.5);
-  ground.w += distortion - 1.0;
+  ground.w += distortion;
   ground = normalize(ground);
   //return dot(p, ground.xyz) + ground.w;
   return p.y*0.1 + (distortion-0.4) * (1.0-smoothstep(1.0, 3.0, p.y/5.0));

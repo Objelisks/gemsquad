@@ -145,9 +145,8 @@ void main()
     
     float minStep = 0.25;
     float distance = minStep * 2.0;
-    vec3 currentPos = rayOrigin;
-    const int MAX_STEPS = 15;
-    int stepped = 0;
+    float t = 0.;
+    const int MAX_STEPS = 30;
     
     // raymarching time!
     // start at the camera position and head towards the current pixel
@@ -155,17 +154,16 @@ void main()
     for(int i=0; i<MAX_STEPS; i++) {
         // each step, move ahead as far as we can
         // if we know that the closest object is distance away, we can move at least that far
-     	currentPos += abs(distance - minStep) * rayDirection;
+     	t += distance*0.95;
         // find the distance to the closest edge
-        distance = scene(currentPos);
+        distance = scene(rayOrigin + t * rayDirection);
         if(distance < minStep) {
-            stepped = i;
 			break;
         }
     }
+    
+    vec3 currentPos = rayOrigin + t * rayDirection;
 
-    // TODO: fix this
-    //gl_FragDepthEXT = length(currentPos - (vRotation * camera * vec4(0,0,0,1.)).xyz);
     
     // if we've stepped all the way and we aren't close to the surface, we've probably gone past it
     // so default to background and skip lighting calculations
@@ -173,6 +171,8 @@ void main()
 		gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
         discard;
     }
+
+    gl_FragDepthEXT = t;
     
     float detail = detailMap(currentPos);
     float dirt = dirtMap(vUv.xyy * 2.0);

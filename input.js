@@ -34,5 +34,15 @@ define(function(require) {
 		}
 	}
 
+	input.addOnce = function(key, cb) {
+		var thing = function(e) {
+			if(e.key === key) {
+				window.removeEventListener(thing);
+				cb();
+			}
+		}
+		window.addEventListener('keypress', thing);
+	}
+
 	return input;
 });

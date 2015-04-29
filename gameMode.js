@@ -8,6 +8,7 @@ define(function(require) {
 	var camera = require('camera');
 	var gem = require('gem');
 	var physicsController = require('physicsController');
+	var dialogue = require('dialogue');
 
 	// entities needs to be visible to update loop and setup
 	var entities = [];
@@ -48,6 +49,10 @@ define(function(require) {
 
 			var gem1 = new entity().of([gem, physicsController]);
 			world.addUpdate(gem1);
+
+			var textTest = new entity().of([dialogue(dialogue.intro)]);
+			textTest.position.y -= 2;
+			world.add(textTest);
 
 		}
 	};
