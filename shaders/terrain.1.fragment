@@ -115,78 +115,54 @@ uniform float time;
 uniform float korg[8];
 
 float EPSILON = 0.1;
-float PI = 3.1415;
-const int MAX_STEPS = 200;
+const int MAX_STEPS = 100;
 
-struct mat {
-  float dist;
-  vec3 color;
-};
 
-float smin( float a, float b, float k )
-{
-    float h = clamp( 0.5+0.5*(b-a)/k, 0.0, 1.0 );
-    return mix( b, a, h ) - k*h*(1.0-h);
-}
-
-mat cmin(mat a, mat b, float k) {
-  //return a.x < b.x ? a : b;
-  float h = clamp( 0.5+0.5*(b.dist-a.dist)/k, 0.0, 1.0 );
-  return mat(mix( b.dist, a.dist, h ) - k*h*(1.0-h), mix( b.color, a.color, h ) - k*h*(1.0-h));
-}
-
-float rand(vec3 co){
-    return fract(sin(dot(co.xyz ,vec3(12.9898,78.233,126.4356))) * 43758.5453);
-}
 
 float noise(vec3 p) {
   return sin(p.x) * sin(p.y) * sin(p.z);
-  //return snoise(p / 10.0);
+  //return snoise(p / 5.0);
 }
 
 float fbm(vec3 p) {
-  return noise(p + vec3(noise(p) + 50.0, noise(p) + 5., noise(p) + 20.0));
+  return noise(p + vec3(noise(p) + 50.0, noise(p), noise(p) + 20.0));
 }
 
-float sqrwav(float t) {
-  return smoothstep(-0.5, 0.5, sin(t));
+float pattern(vec3 p) {
+  p.y += 10.0;
+  float distortion = fbm(p * 0.5) / 0.5;
+  distortion += fbm(p * 0.25) / 0.25;
+  distortion += fbm(p * 0.125) / 0.125;
+  distortion += fbm(p * 0.0625) / 0.0625;
+
+  vec4 ground = vec4(0, 0.5, 0, 0.5);
+  ground.w += distortion;
+  ground = normalize(ground);
+  //return dot(p, ground.xyz) + ground.w;
+  return p.y*0.1 + (distortion-0.4) * (1.0-smoothstep(1.0, 3.0, p.y/5.0));
 }
 
-float triwav(float t) {
-  return min(abs(mod(t, 4.) - 2.) - 1., 0.7);
+
+
+
+float dist_sphere(vec3 p, vec3 c, float r) {
+	return length(p - c) - r;
 }
 
-float towers_dist(vec3 p) {
-  float sep = 20.;
-  float rep = sep - noise(p/sep)*sep;
-  p += vec3((noise(p)/2.)*2., (noise(p)/2.)*2., (noise(p)/2.)*2.);
-  vec3 q = mod(p, rep) - rep/2.0;
-  q.y = p.y;
-  return length(max(abs(q)-vec3(1., 5. - noise(p / rep) * 10., 1.),0.0))-0.5;
+float dist_plane(vec3 p, vec4 n) {
+	p += vec3(10.0, 0.0, 10.0);
+	float n1 = snoise(p / 10.0);
+	float n2 = snoise(p / 2.0);
+	float n3 = snoise(p * 10.0);
+	n.w += n1 / 1.0 + n2 / (n1*5.0+5.0) + n3 / ((1.0-n2)*100.0+100.0) - 1.0;
+  //n.w += n1;
+	n = normalize(n);
+	return dot(p,n.xyz) + n.w;
 }
 
-float grass_dist(vec3 p) {
-  p.x += noise(p/5. + vec3(sin(time+noise(p)),0.,0.))*5.;
-  float t = snoise(vec3(p.xz / 10.0, 0.0));
-  float t2 = snoise(vec3(p.x/5.0, 0.0, p.z/5.))*100.;
-  float comp = floor(10.+sin((noise(p)+1.0)/(abs(p.x)+1.0))*10.)*korg[0]/10.;
-  vec3 q = mod(p, comp) - comp/2.;
-  q.y = p.y + 2.0 - snoise(floor(p)*10.)*5.0;
-  return dot(vec2(10.0, 2.0), vec2(length(q.xz), q.y));
-}
-
-mat scene(vec3 p) {
-  float triangles = p.y - triwav(p.x/4.0) * triwav(p.z/4.0) + sin(p.x)*cos(p.z)/5.0;
-  float towers = towers_dist(p / 2.0) * 2.0;
-  float grass = grass_dist(p);
-  
-  return cmin(
-          cmin(
-            mat(triangles, vec3(0.7, 0.5, 0.3)),
-            mat(towers, vec3(0.3, 0.5, 0.7)), 0.8
-          ),
-          mat(grass, vec3(0.1+noise(p/2.), 0.7, 0.2)), 0.99
-         );
+float scene(vec3 p) {
+	//return dist_plane(p, vec4(0,0.5,0,0.5));
+  return pattern(p);
 }
 
 /*
@@ -195,14 +171,14 @@ mat scene(vec3 p) {
 */
 vec3 getNormal(vec3 p, float d) {
 	vec3 n1 = vec3(
-        scene(vec3(p.x + EPSILON, p.y, p.z)).dist,
-        scene(vec3(p.x, p.y + EPSILON, p.z)).dist,
-        scene(vec3(p.x, p.y, p.z + EPSILON)).dist
+        scene(vec3(p.x + EPSILON, p.y, p.z)),
+        scene(vec3(p.x, p.y + EPSILON, p.z)),
+        scene(vec3(p.x, p.y, p.z + EPSILON))
     );
 	vec3 n2 = vec3(
-        scene(vec3(p.x - EPSILON, p.y, p.z)).dist,
-        scene(vec3(p.x, p.y - EPSILON, p.z)).dist,
-        scene(vec3(p.x, p.y, p.z - EPSILON)).dist
+        scene(vec3(p.x - EPSILON, p.y, p.z)),
+        scene(vec3(p.x, p.y - EPSILON, p.z)),
+        scene(vec3(p.x, p.y, p.z - EPSILON))
     );
   return normalize(n1 - d);
 }
@@ -222,12 +198,12 @@ float softshadow(in vec3 ro, in vec3 rd, float k)
   float t = 0.01;
   for( int i=0; i<30; i++ )
   {
-    float dist = scene(ro + rd*t).dist;
+    float dist = scene(ro + rd*t);
 
     // cone
     result = min( result, k*dist/t );
-	  t += max(dist*0.5, 0.1);
-    if( dist< 0.0001 ) break;
+	  t += max(dist, 0.1);
+	if( dist< 0.0001 ) break;
   }
   return clamp(result,0.0,1.0);
 }
@@ -243,38 +219,38 @@ void main() {
 	vec3 rayOrigin = (camera * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
 	vec3 rayDirection = (camera * vec4(normalize(vec3(coords, -1.0)), 0.0)).xyz;
 
-	float minStep = 0.1;
-	mat distance = mat(0.0, vec3(0.0));
+	float minStep = 0.00001;
+	float distance = 0.0;
   float t = 0.5;
 
 	for(int i=0; i<MAX_STEPS; i++) {
 		distance = scene(rayOrigin + t * rayDirection);
-		if(distance.dist < minStep) {
+		if(abs(distance) < minStep) {
 			break;
 		}
-    t += distance.dist * 0.2;
+    t += distance;
 	}
+	//distance = clamp(distance, 0.0, 1.0);
 
   vec3 currentPos = rayOrigin + t * rayDirection;
 
 	// alternative var to write to for depth
 	gl_FragDepthEXT = t;
 
-	if(distance.dist > 1.0) {
+	if(distance > 1.0) {
 		gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
 		return;
 	}
 
-	vec3 normal = getNormal(currentPos, distance.dist);
-	vec3 color = distance.color;
+	vec3 normal = getNormal(currentPos, distance);
+	vec3 color = vec3(0.0, 0.6, 0.9);
 	vec3 lightColor = vec3(0.8, 0.88, 0.8);
-	vec3 lightPos = normalize(vec3(1.0, 1.0, 2.0));
+	vec3 lightPos = normalize(vec3(0.0*korg[0], 1.0*korg[1], -2.0*korg[2]));
 	vec3 reflectAngle = reflect(rayDirection, normal);
-  float attenuation = 1.0 / (1.0 + 0.0002*pow( length(currentPos - rayOrigin), 2.0));
-	float diffComp = diffuse(normal, lightPos, 1.0) * attenuation;
-	float specComp = specular(reflectAngle, lightPos, 2.0) * attenuation;
+	float diffComp = diffuse(normal, lightPos, 1.0);
+	float specComp = specular(reflectAngle, lightPos, 2.0);
 	float ambient = 0.2;
-	float shadow = softshadow(currentPos + 0.1 * normal, lightPos, 32.0);
+	float shadow = softshadow(currentPos + 0.1 * normal, lightPos, 128.0);
 
 	gl_FragColor = vec4(color * clamp(max(diffComp,ambient), 0.0, 1.0) * clamp(max(shadow,ambient), 0.0, 1.0) + lightColor * specComp * shadow / 3.0, 1.0);
 }

@@ -2,7 +2,7 @@ define(function(require) {
 	var component = require('component');
 	var world = require('world');
 
-	var cameraOffset = new THREE.Vector3(0, 2.5, 2.5);
+	var cameraOffset = new THREE.Vector3(0, 10.5, 10.5);
 
 	var camera = function(target) {
 		component.call(this, 'camera', target);
