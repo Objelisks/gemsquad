@@ -1,0 +1,420 @@
+//
+// Description : Array and textureless GLSL 2D/3D/4D simplex 
+//               noise functions.
+//      Author : Ian McEwan, Ashima Arts.
+//  Maintainer : ijm
+//     Lastmod : 20110822 (ijm)
+//     License : Copyright (C) 2011 Ashima Arts. All rights reserved.
+//               Distributed under the MIT License. See LICENSE file.
+//               https://github.com/ashima/webgl-noise
+// 
+
+vec3 mod289(vec3 x) {
+  return x - floor(x * (1.0 / 289.0)) * 289.0;
+}
+
+vec4 mod289(vec4 x) {
+  return x - floor(x * (1.0 / 289.0)) * 289.0;
+}
+
+vec4 permute(vec4 x) {
+     return mod289(((x*34.0)+1.0)*x);
+}
+
+vec4 taylorInvSqrt(vec4 r)
+{
+  return 1.79284291400159 - 0.85373472095314 * r;
+}
+
+float snoise(vec3 v)
+  { 
+  const vec2  C = vec2(1.0/6.0, 1.0/3.0) ;
+  const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
+
+// First corner
+  vec3 i  = floor(v + dot(v, C.yyy) );
+  vec3 x0 =   v - i + dot(i, C.xxx) ;
+
+// Other corners
+  vec3 g = step(x0.yzx, x0.xyz);
+  vec3 l = 1.0 - g;
+  vec3 i1 = min( g.xyz, l.zxy );
+  vec3 i2 = max( g.xyz, l.zxy );
+
+  //   x0 = x0 - 0.0 + 0.0 * C.xxx;
+  //   x1 = x0 - i1  + 1.0 * C.xxx;
+  //   x2 = x0 - i2  + 2.0 * C.xxx;
+  //   x3 = x0 - 1.0 + 3.0 * C.xxx;
+  vec3 x1 = x0 - i1 + C.xxx;
+  vec3 x2 = x0 - i2 + C.yyy; // 2.0*C.x = 1/3 = C.y
+  vec3 x3 = x0 - D.yyy;      // -1.0+3.0*C.x = -0.5 = -D.y
+
+// Permutations
+  i = mod289(i); 
+  vec4 p = permute( permute( permute( 
+             i.z + vec4(0.0, i1.z, i2.z, 1.0 ))
+           + i.y + vec4(0.0, i1.y, i2.y, 1.0 )) 
+           + i.x + vec4(0.0, i1.x, i2.x, 1.0 ));
+
+// Gradients: 7x7 points over a square, mapped onto an octahedron.
+// The ring size 17*17 = 289 is close to a multiple of 49 (49*6 = 294)
+  float n_ = 0.142857142857; // 1.0/7.0
+  vec3  ns = n_ * D.wyz - D.xzx;
+
+  vec4 j = p - 49.0 * floor(p * ns.z * ns.z);  //  mod(p,7*7)
+
+  vec4 x_ = floor(j * ns.z);
+  vec4 y_ = floor(j - 7.0 * x_ );    // mod(j,N)
+
+  vec4 x = x_ *ns.x + ns.yyyy;
+  vec4 y = y_ *ns.x + ns.yyyy;
+  vec4 h = 1.0 - abs(x) - abs(y);
+
+  vec4 b0 = vec4( x.xy, y.xy );
+  vec4 b1 = vec4( x.zw, y.zw );
+
+  //vec4 s0 = vec4(lessThan(b0,0.0))*2.0 - 1.0;
+  //vec4 s1 = vec4(lessThan(b1,0.0))*2.0 - 1.0;
+  vec4 s0 = floor(b0)*2.0 + 1.0;
+  vec4 s1 = floor(b1)*2.0 + 1.0;
+  vec4 sh = -step(h, vec4(0.0));
+
+  vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy ;
+  vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww ;
+
+  vec3 p0 = vec3(a0.xy,h.x);
+  vec3 p1 = vec3(a0.zw,h.y);
+  vec3 p2 = vec3(a1.xy,h.z);
+  vec3 p3 = vec3(a1.zw,h.w);
+
+//Normalise gradients
+  vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
+  p0 *= norm.x;
+  p1 *= norm.y;
+  p2 *= norm.z;
+  p3 *= norm.w;
+
+// Mix final noise value
+  vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+  m = m * m;
+  return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1), 
+                                dot(p2,x2), dot(p3,x3) ) );
+  }
+  
+vec2 mod289(vec2 x) {
+  return x - floor(x * (1.0 / 289.0)) * 289.0;
+}
+
+vec3 permute(vec3 x) {
+  return mod289(((x*34.0)+1.0)*x);
+}
+
+float snoise(vec2 v)
+  {
+  const vec4 C = vec4(0.211324865405187,  // (3.0-sqrt(3.0))/6.0
+                      0.366025403784439,  // 0.5*(sqrt(3.0)-1.0)
+                     -0.577350269189626,  // -1.0 + 2.0 * C.x
+                      0.024390243902439); // 1.0 / 41.0
+// First corner
+  vec2 i  = floor(v + dot(v, C.yy) );
+  vec2 x0 = v -   i + dot(i, C.xx);
+
+// Other corners
+  vec2 i1;
+  //i1.x = step( x0.y, x0.x ); // x0.x > x0.y ? 1.0 : 0.0
+  //i1.y = 1.0 - i1.x;
+  i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+  // x0 = x0 - 0.0 + 0.0 * C.xx ;
+  // x1 = x0 - i1 + 1.0 * C.xx ;
+  // x2 = x0 - 1.0 + 2.0 * C.xx ;
+  vec4 x12 = x0.xyxy + C.xxzz;
+  x12.xy -= i1;
+
+// Permutations
+  i = mod289(i); // Avoid truncation effects in permutation
+  vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 ))
+		+ i.x + vec3(0.0, i1.x, 1.0 ));
+
+  vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+  m = m*m ;
+  m = m*m ;
+
+// Gradients: 41 points uniformly over a line, mapped onto a diamond.
+// The ring size 17*17 = 289 is close to a multiple of 41 (41*7 = 287)
+
+  vec3 x = 2.0 * fract(p * C.www) - 1.0;
+  vec3 h = abs(x) - 0.5;
+  vec3 ox = floor(x + 0.5);
+  vec3 a0 = x - ox;
+
+// Normalise gradients implicitly by scaling m
+// Approximation of: m *= inversesqrt( a0*a0 + h*h );
+  m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );
+
+// Compute final noise value at P
+  vec3 g;
+  g.x  = a0.x  * x0.x  + h.x  * x0.y;
+  g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+  return 130.0 * dot(m, g);
+}
+
+float rand(vec3 co){
+    return fract(sin(dot(co.xyz ,vec3(12.9898,78.233,126.4356))) * 43758.5453);
+}
+
+void iGetIntegerAndFractional(float x, out float integ, out float fra) {
+  integ = floor(x);
+  fra = fract(x);
+}
+
+float dnoise3f( vec3 p )
+{
+    float   i, j, k;
+    float u, v, w;
+
+    iGetIntegerAndFractional( p.x, i, u );
+    iGetIntegerAndFractional( p.y, j, v );
+    iGetIntegerAndFractional( p.z, k, w );
+
+    float du = 30.0*u*u*(u*(u-2.0)+1.0);
+    float dv = 30.0*v*v*(v*(v-2.0)+1.0);
+    float dw = 30.0*w*w*(w*(w-2.0)+1.0);
+
+    u = u*u*u*(u*(u*6.0-15.0)+10.0);
+    v = v*v*v*(v*(v*6.0-15.0)+10.0);
+    w = w*w*w*(w*(w*6.0-15.0)+10.0);
+
+    float a = rand( vec3(i+0., j+0., k+0.) );
+    float b = rand( vec3(i+1., j+0., k+0.) );
+    float c = rand( vec3(i+0., j+1., k+0.) );
+    float d = rand( vec3(i+1., j+1., k+0.) );
+    float e = rand( vec3(i+0., j+0., k+1.) );
+    float f = rand( vec3(i+1., j+0., k+1.) );
+    float g = rand( vec3(i+0., j+1., k+1.) );
+    float h = rand( vec3(i+1., j+1., k+1.) );
+
+    float k0 =   a;
+    float k1 =   b - a;
+    float k2 =   c - a;
+    float k3 =   e - a;
+    float k4 =   a - b - c + d;
+    float k5 =   a - c - e + g;
+    float k6 =   a - b - e + f;
+    float k7 = - a + b + c - d + e - f - g + h;
+
+    return k0 + k1*u + k2*v + k3*w + k4*u*v + k5*v*w + k6*w*u + k7*u*v*w; // vout[0]
+    //vout[1] = du * (k1 + k4*v + k6*w + k7*v*w);
+    //vout[2] = dv * (k2 + k5*w + k4*u + k7*w*u);
+    //vout[3] = dw * (k3 + k6*u + k5*v + k7*u*v);
+    
+}
+
+
+
+
+// allow support of gl_FragDepth writing in webgl
+// extension also needs to be enabled on context (see renderer.js)
+#extension GL_EXT_frag_depth : enable
+
+varying vec2 vuv;
+uniform mat4 camera;
+uniform vec2 res;
+uniform float time;
+uniform float korg[8];
+
+float EPSILON = 0.1;
+float PI = 3.1415;
+const int MAX_STEPS = 200;
+
+struct mat {
+  float dist;
+  vec3 color;
+};
+
+float smin( float a, float b, float k )
+{
+    float h = clamp( 0.5+0.5*(b-a)/k, 0.0, 1.0 );
+    return mix( b, a, h ) - k*h*(1.0-h);
+}
+
+mat cmin(mat a, float k, mat b) {
+  //return a.x < b.x ? a : b;
+  float h = clamp( 0.5+0.5*(b.dist-a.dist)/k, 0.0, 1.0 );
+  return mat(mix( b.dist, a.dist, h ) - k*h*(1.0-h), mix( b.color, a.color, h ) - k*h*(1.0-h));
+}
+
+float sqrwav(float t) {
+  return smoothstep(-0.5, 0.5, sin(t));
+}
+
+float triwav(float t) {
+  return min(abs(mod(t, 4.) - 2.) - 1., 0.7);
+}
+
+float cont(vec3 co) {
+  return snoise(co.xz+co.y);
+}
+
+
+float noise(vec3 p) {
+  //float thing = mod(p.x, p.y) * fract(p.z);
+  //return smoothstep(-0.1, 1.0, cont(p - cont(p)));
+  //return triwav(thing)*sqrwav(thing)*sin(thing);
+  //return sin(p.x-0.1) * cos(p.y+0.1) * sin(p.z+0.3);
+  //return snoise(p / 10.0);
+  return dnoise3f(p);
+}
+
+float fbm(vec3 p) {
+  return noise(p + noise(p));
+}
+
+float groundLevel(vec3 p) {
+  return fbm(p / 32.) * 10.;
+}
+
+float box( vec3 p, vec3 b )
+{
+  vec3 d = abs(p) - b;
+  return min(max(d.x,max(d.y,d.z)),0.0) +
+         length(max(d,0.0));
+}
+
+float towers_dist(vec3 p) {
+  float sep = 20.;
+  float rep = sep - noise(p/sep)*sep;
+  p += vec3((noise(p)/2.)*2., (noise(p)/2.)*2., (noise(p)/2.)*2.);
+  vec3 q = mod(p, rep) - rep/2.0;
+  q.y = p.y;
+  return length(max(abs(q)-vec3(1., 5. - noise(p / rep) * 10., 1.),0.0))-0.5;
+}
+
+float rocks_dist(vec3 p) {
+  p += vec3(3.14*1.5*abs(noise(floor((p+0.5)/8.)*8.)), -noise(p), 3.14*1.5*abs(noise(floor((p+0.5)/8.)*8.)));
+  vec3 q = mod(p, 8.) - 4.;
+  q.y = p.y;
+  float side = 1.-p.y/2.;
+  return box(q*2., vec3(side, 0.6, side))/2.;
+}
+
+float grass_dist(vec3 p) {
+  p.x += cos(time+noise(p*4.)*p.y)/(6.-p.y);
+  float t = noise(vec3(p.xz / 10.0, 0.0));
+  float comp = floor(10.+sin((noise(p)+1.0)/(abs(p.x)+1.0))*10.)/20.;
+  vec3 q = mod(p, comp) - comp/2.;
+  q.y = p.y + 0.0 - noise(floor(p)*10.)*2.0;
+  return dot(vec2(10.0, 2.0), vec2(length(q.xz), q.y));
+}
+
+float player_dist(vec3 p) {
+  vec3 cvec = (camera * vec4(0., 0., 0., 1.)).xyz - vec3(0., 8.-sin(time*2.0), 10.);
+  return length(p - cvec) - 2.0;
+}
+
+mat scene(vec3 p) {
+  p.y -= groundLevel(p);
+  float triangles = p.y - triwav(p.x/4.0) * triwav(p.z/4.0) + sin(p.x)*cos(p.z)/5.0;
+  float towers = towers_dist(p / 2.0) * 2.0;
+  float grass = grass_dist(vec3(p.x, p.y, p.z));
+  float rocks = rocks_dist(p);
+  float player = player_dist(p);
+  
+  return cmin(mat(rocks, vec3(0.7, 0.7, 0.7)), 0.0,
+         cmin(mat(triangles, vec3(0.7, 0.5, 0.3)), 0.5,
+         cmin(mat(towers, vec3(0.3, 0.5, 0.7)), 0.9,
+         cmin(mat(player, vec3(1., 0., 0.)), 0.3,
+              mat(grass, vec3(0.1+noise(p/2.), 0.7, 0.2))))));
+}
+
+/*
+	Gets the normal direction at a given point in space.
+	Compute the derivative of each spatial direction.
+*/
+vec3 getNormal(vec3 p, float d) {
+	vec3 n1 = vec3(
+        scene(vec3(p.x + EPSILON, p.y, p.z)).dist,
+        scene(vec3(p.x, p.y + EPSILON, p.z)).dist,
+        scene(vec3(p.x, p.y, p.z + EPSILON)).dist
+    );
+	vec3 n2 = vec3(
+        scene(vec3(p.x - EPSILON, p.y, p.z)).dist,
+        scene(vec3(p.x, p.y - EPSILON, p.z)).dist,
+        scene(vec3(p.x, p.y, p.z - EPSILON)).dist
+    );
+  return normalize(n1 - d);
+}
+
+float diffuse(vec3 normal, vec3 lightRay, float intensity) {
+  return clamp(dot(lightRay, normal) * intensity, 0.0, 1.0);
+}
+
+float specular(vec3 reflectAngle, vec3 lightRay, float shininess) {
+  return pow(clamp(dot(reflectAngle, lightRay), 0.0, 1.0), shininess);
+}
+
+// k is inv proportional to the radius of the light
+float softshadow(in vec3 ro, in vec3 rd, float k)
+{
+  float result = 1.0;
+  float t = 0.01;
+  for( int i=0; i<30; i++ )
+  {
+    float dist = scene(ro + rd*t).dist;
+
+    // cone
+    result = min( result, k*dist/t );
+	  t += max(dist*0.5, 0.5);
+    if( dist< 0.0001 ) break;
+  }
+  return clamp(result,0.0,1.0);
+}
+
+void main() {
+	// doo some ray march ing
+
+	float aspectRatio = res.y / res.x;
+	vec2 coords = vuv * 2.0 - 1.0;
+	coords.x *= 2.0;
+
+	// use the actual scene camera transform to rotate/translate the ray origin/dir
+	vec3 rayOrigin = (camera * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+  rayOrigin.y += groundLevel(rayOrigin);
+	vec3 rayDirection = (camera * vec4(normalize(vec3(coords, -1.0)), 0.0)).xyz;
+
+	float minStep = 0.1;
+	mat distance = mat(0.0, vec3(0.0));
+  float t = 0.5;
+
+	for(int i=0; i<MAX_STEPS; i++) {
+		distance = scene(rayOrigin + t * rayDirection);
+		if(distance.dist < minStep) {
+			break;
+		}
+    t += distance.dist * 0.5;
+	}
+
+  vec3 currentPos = rayOrigin + t * rayDirection;
+
+	// alternative var to write to for depth
+	gl_FragDepthEXT = t;
+
+	if(distance.dist > 1.0 || player_dist(currentPos) > 32.) {
+		gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+		return;
+	}
+
+	vec3 normal = getNormal(currentPos, distance.dist);
+	vec3 color = distance.color;
+	vec3 lightColor = vec3(0.8, 0.88, 0.8);
+	vec3 lightPos = normalize(vec3(1.0, 1.0, 2.0));
+	vec3 reflectAngle = reflect(rayDirection, normal);
+  float attenuation = 1.0 / (1.0 + 0.00002*pow( length(currentPos - rayOrigin), 3.0));
+  
+	float diffComp = diffuse(normal, lightPos, 1.0) * attenuation;
+	float specComp = specular(reflectAngle, lightPos, 2.0) * attenuation;
+	float ambient = 0.2;
+	float shadow = softshadow(currentPos + 0.1 * normal, lightPos, 32.0);
+  
+
+	gl_FragColor = vec4(color * clamp(max(diffComp,ambient), 0.0, 1.0) * clamp(max(shadow,ambient), 0.0, 1.0) + lightColor * specComp * shadow / 3.0, 1.0);
+}

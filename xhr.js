@@ -1,16 +1,17 @@
 define(function(require) {
 
 	// gets a single remoet thing and runs a callback when returned
-	var getThing = function(name, cb) {
+	var getThing = function(name, cb, i) {
 		var xhr = new XMLHttpRequest();
 
 		xhr.onload = function(e) {
 			if(xhr.status === 200) {
-				cb(xhr.responseText);
+				cb(xhr.responseText, i);
 			}
 		};
 
 		xhr.open('GET', './' + name, true);
+		xhr.setRequestHeader("Cache-Control", "no-cache");
 		xhr.send(null);
 	};
 
@@ -18,8 +19,8 @@ define(function(require) {
 	var getThings = function(thingList, cb) {
 		var finishedThings = [];
 		var remainingThings = thingList.length;
-		var finishThings = function(thing) {
-			finishedThings.push(thing);
+		var finishThings = function(thing, i) {
+			finishedThings[i] = thing;
 			remainingThings--;
 			if(remainingThings <= 0) {
 				cb(finishedThings);
@@ -27,7 +28,7 @@ define(function(require) {
 		};
 
 		for (var i = 0; i < thingList.length; i++) {
-			getThing(thingList[i], finishThings);
+			getThing(thingList[i], finishThings, i);
 		}
 	}
 

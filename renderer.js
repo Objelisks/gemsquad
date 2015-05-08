@@ -4,7 +4,7 @@ define(function(require) {
 	var korgvar = require('korgvar');
 
 	var renderer = new THREE.WebGLRenderer();
-	renderer.setSize(window.innerWidth*.8, window.innerHeight*.8);
+	renderer.setSize(window.innerWidth*0.9, window.innerHeight*0.9);
 	document.body.appendChild(renderer.domElement);
 	renderer.autoClear = false;
 	renderer.context.getExtension('EXT_frag_depth');
@@ -51,9 +51,6 @@ define(function(require) {
 		setup: function(world) {
 
 			var camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-			camera.position.y = 2.5;
-			camera.position.z = 2.5;
-			camera.lookAt(new THREE.Vector3(0, 0, 0));
 			world.camera = camera;
 			uniforms.camera = {type: 'm4', value: camera.matrixWorld };
 		},

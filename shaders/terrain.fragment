@@ -1,109 +1,3 @@
-//
-// Description : Array and textureless GLSL 2D/3D/4D simplex 
-//               noise functions.
-//      Author : Ian McEwan, Ashima Arts.
-//  Maintainer : ijm
-//     Lastmod : 20110822 (ijm)
-//     License : Copyright (C) 2011 Ashima Arts. All rights reserved.
-//               Distributed under the MIT License. See LICENSE file.
-//               https://github.com/ashima/webgl-noise
-// 
-
-vec3 mod289(vec3 x) {
-  return x - floor(x * (1.0 / 289.0)) * 289.0;
-}
-
-vec4 mod289(vec4 x) {
-  return x - floor(x * (1.0 / 289.0)) * 289.0;
-}
-
-vec4 permute(vec4 x) {
-     return mod289(((x*34.0)+1.0)*x);
-}
-
-vec4 taylorInvSqrt(vec4 r)
-{
-  return 1.79284291400159 - 0.85373472095314 * r;
-}
-
-float snoise(vec3 v)
-  { 
-  const vec2  C = vec2(1.0/6.0, 1.0/3.0) ;
-  const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
-
-// First corner
-  vec3 i  = floor(v + dot(v, C.yyy) );
-  vec3 x0 =   v - i + dot(i, C.xxx) ;
-
-// Other corners
-  vec3 g = step(x0.yzx, x0.xyz);
-  vec3 l = 1.0 - g;
-  vec3 i1 = min( g.xyz, l.zxy );
-  vec3 i2 = max( g.xyz, l.zxy );
-
-  //   x0 = x0 - 0.0 + 0.0 * C.xxx;
-  //   x1 = x0 - i1  + 1.0 * C.xxx;
-  //   x2 = x0 - i2  + 2.0 * C.xxx;
-  //   x3 = x0 - 1.0 + 3.0 * C.xxx;
-  vec3 x1 = x0 - i1 + C.xxx;
-  vec3 x2 = x0 - i2 + C.yyy; // 2.0*C.x = 1/3 = C.y
-  vec3 x3 = x0 - D.yyy;      // -1.0+3.0*C.x = -0.5 = -D.y
-
-// Permutations
-  i = mod289(i); 
-  vec4 p = permute( permute( permute( 
-             i.z + vec4(0.0, i1.z, i2.z, 1.0 ))
-           + i.y + vec4(0.0, i1.y, i2.y, 1.0 )) 
-           + i.x + vec4(0.0, i1.x, i2.x, 1.0 ));
-
-// Gradients: 7x7 points over a square, mapped onto an octahedron.
-// The ring size 17*17 = 289 is close to a multiple of 49 (49*6 = 294)
-  float n_ = 0.142857142857; // 1.0/7.0
-  vec3  ns = n_ * D.wyz - D.xzx;
-
-  vec4 j = p - 49.0 * floor(p * ns.z * ns.z);  //  mod(p,7*7)
-
-  vec4 x_ = floor(j * ns.z);
-  vec4 y_ = floor(j - 7.0 * x_ );    // mod(j,N)
-
-  vec4 x = x_ *ns.x + ns.yyyy;
-  vec4 y = y_ *ns.x + ns.yyyy;
-  vec4 h = 1.0 - abs(x) - abs(y);
-
-  vec4 b0 = vec4( x.xy, y.xy );
-  vec4 b1 = vec4( x.zw, y.zw );
-
-  //vec4 s0 = vec4(lessThan(b0,0.0))*2.0 - 1.0;
-  //vec4 s1 = vec4(lessThan(b1,0.0))*2.0 - 1.0;
-  vec4 s0 = floor(b0)*2.0 + 1.0;
-  vec4 s1 = floor(b1)*2.0 + 1.0;
-  vec4 sh = -step(h, vec4(0.0));
-
-  vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy ;
-  vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww ;
-
-  vec3 p0 = vec3(a0.xy,h.x);
-  vec3 p1 = vec3(a0.zw,h.y);
-  vec3 p2 = vec3(a1.xy,h.z);
-  vec3 p3 = vec3(a1.zw,h.w);
-
-//Normalise gradients
-  vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
-  p0 *= norm.x;
-  p1 *= norm.y;
-  p2 *= norm.z;
-  p3 *= norm.w;
-
-// Mix final noise value
-  vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
-  m = m * m;
-  return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1), 
-                                dot(p2,x2), dot(p3,x3) ) );
-  }
-
-
-
-
 // allow support of gl_FragDepth writing in webgl
 // extension also needs to be enabled on context (see renderer.js)
 #extension GL_EXT_frag_depth : enable
@@ -114,7 +8,7 @@ uniform vec2 res;
 uniform float time;
 uniform float korg[8];
 
-float EPSILON = 0.1;
+float EPSILON = 0.001;
 float PI = 3.1415;
 const int MAX_STEPS = 200;
 
@@ -123,70 +17,116 @@ struct mat {
   vec3 color;
 };
 
+float rand(vec3 co){
+    return fract(sin(dot(co.xyz ,vec3(12.9898,78.233,124.5432))) * 43758.5453);
+}
+
+vec4 dnoise(vec3 p)
+{
+    float i, j, k;
+    float u, v, w;
+
+	i = floor(p.x);
+	u = fract(p.x);
+	j = floor(p.y);
+	v = fract(p.y);
+	k = floor(p.z);
+	w = fract(p.z);
+
+    float du = 30.0*u*u*(u*(u-2.0)+1.0);
+    float dv = 30.0*v*v*(v*(v-2.0)+1.0);
+    float dw = 30.0*w*w*(w*(w-2.0)+1.0);
+
+    u = u*u*u*(u*(u*6.0-15.0)+10.0);
+    v = v*v*v*(v*(v*6.0-15.0)+10.0);
+    w = w*w*w*(w*(w*6.0-15.0)+10.0);
+
+    float a = rand(vec3(i+0., j+0., k+0.));
+    float b = rand(vec3(i+1., j+0., k+0.));
+    float c = rand(vec3(i+0., j+1., k+0.));
+    float d = rand(vec3(i+1., j+1., k+0.));
+    float e = rand(vec3(i+0., j+0., k+1.));
+    float f = rand(vec3(i+1., j+0., k+1.));
+    float g = rand(vec3(i+0., j+1., k+1.));
+    float h = rand(vec3(i+1., j+1., k+1.));
+
+    float k0 =   a;
+    float k1 =   b - a;
+    float k2 =   c - a;
+    float k3 =   e - a;
+    float k4 =   a - b - c + d;
+    float k5 =   a - c - e + g;
+    float k6 =   a - b - e + f;
+    float k7 = - a + b + c - d + e - f - g + h;
+
+    return vec4(k0 + k1*u + k2*v + k3*w + k4*u*v + k5*v*w + k6*w*u + k7*u*v*w,
+    	du * (k1 + k4*v + k6*w + k7*v*w),
+    	dv * (k2 + k5*w + k4*u + k7*w*u),
+    	dw * (k3 + k6*u + k5*v + k7*u*v));
+}
+
+float fbm(vec3 p, float lac) {
+	float f = 0.;
+	float w = lac;
+	for(int i=0; i < 3; i++) {
+		vec4 n = dnoise(p);
+		f += w * n.x / (1.0 + n.y*n.y + n.z*n.z + n.w*n.w);
+		w *= lac;
+		p *= 2.0;
+	}
+	return f;
+}
+
 float smin( float a, float b, float k )
 {
     float h = clamp( 0.5+0.5*(b-a)/k, 0.0, 1.0 );
     return mix( b, a, h ) - k*h*(1.0-h);
 }
 
-mat cmin(mat a, mat b, float k) {
+mat cmin(mat a, float k, mat b) {
   //return a.x < b.x ? a : b;
   float h = clamp( 0.5+0.5*(b.dist-a.dist)/k, 0.0, 1.0 );
   return mat(mix( b.dist, a.dist, h ) - k*h*(1.0-h), mix( b.color, a.color, h ) - k*h*(1.0-h));
 }
 
-float rand(vec3 co){
-    return fract(sin(dot(co.xyz ,vec3(12.9898,78.233,126.4356))) * 43758.5453);
+mat u(mat a, mat b) {
+	return a.dist < b.dist ? a : b;
 }
 
-float noise(vec3 p) {
-  return sin(p.x) * sin(p.y) * sin(p.z);
-  //return snoise(p / 10.0);
+mat i(mat a, mat b) {
+	return a.dist > b.dist ? a : b;
 }
 
-float fbm(vec3 p) {
-  return noise(p + vec3(noise(p) + 50.0, noise(p) + 5., noise(p) + 20.0));
+mat d(mat a, mat b) {
+	return -a.dist > b.dist ? mat(-a.dist, a.color) : b;
 }
 
-float sqrwav(float t) {
-  return smoothstep(-0.5, 0.5, sin(t));
+float plane(vec3 p, vec4 n) {
+	return dot(p, n.xyz) + n.w;
 }
 
-float triwav(float t) {
-  return min(abs(mod(t, 4.) - 2.) - 1., 0.7);
+float holes(vec3 p) {
+	vec3 q = mod(p, 10.) - .5;
+	q.y = p.y;
+	return length(q - 5.) - 2.0 * korg[0];
 }
 
-float towers_dist(vec3 p) {
-  float sep = 20.;
-  float rep = sep - noise(p/sep)*sep;
-  p += vec3((noise(p)/2.)*2., (noise(p)/2.)*2., (noise(p)/2.)*2.);
-  vec3 q = mod(p, rep) - rep/2.0;
-  q.y = p.y;
-  return length(max(abs(q)-vec3(1., 5. - noise(p / rep) * 10., 1.),0.0))-0.5;
-}
-
-float grass_dist(vec3 p) {
-  p.x += noise(p/5. + vec3(sin(time+noise(p)),0.,0.))*5.;
-  float t = snoise(vec3(p.xz / 10.0, 0.0));
-  float t2 = snoise(vec3(p.x/5.0, 0.0, p.z/5.))*100.;
-  float comp = floor(10.+sin((noise(p)+1.0)/(abs(p.x)+1.0))*10.)*korg[0]/10.;
-  vec3 q = mod(p, comp) - comp/2.;
-  q.y = p.y + 2.0 - snoise(floor(p)*10.)*5.0;
-  return dot(vec2(10.0, 2.0), vec2(length(q.xz), q.y));
+float stone(vec3 p) {
+	float chip = p.y;
+	chip = max(chip, plane(p, normalize(vec4(1, 1., 1., -2.))));
+	chip = max(chip, plane(p, normalize(vec4(-1, 1., 1., -2.))));
+	chip = max(chip, plane(p, normalize(vec4(-1, 1., -1., -2.))));
+	chip = max(chip, plane(p, normalize(vec4(1, 1., -1., -2.))));
+	return chip;
 }
 
 mat scene(vec3 p) {
-  float triangles = p.y - triwav(p.x/4.0) * triwav(p.z/4.0) + sin(p.x)*cos(p.z)/5.0;
-  float towers = towers_dist(p / 2.0) * 2.0;
-  float grass = grass_dist(p);
-  
-  return cmin(
-          cmin(
-            mat(triangles, vec3(0.7, 0.5, 0.3)),
-            mat(towers, vec3(0.3, 0.5, 0.7)), 0.8
-          ),
-          mat(grass, vec3(0.1+noise(p/2.), 0.7, 0.2)), 0.99
-         );
+
+	p /= 5.0;
+	p.y -= 5.0;
+  mat pyr = d(mat(p.y + fbm(p + vec3(time, 0., 0.), 0.5)*20.0, vec3(0.7)), mat(stone(p), vec3(0.7, 0.2, 0.2)));
+  pyr.dist *= 5.0;
+  return pyr;
 }
 
 /*
@@ -198,11 +138,6 @@ vec3 getNormal(vec3 p, float d) {
         scene(vec3(p.x + EPSILON, p.y, p.z)).dist,
         scene(vec3(p.x, p.y + EPSILON, p.z)).dist,
         scene(vec3(p.x, p.y, p.z + EPSILON)).dist
-    );
-	vec3 n2 = vec3(
-        scene(vec3(p.x - EPSILON, p.y, p.z)).dist,
-        scene(vec3(p.x, p.y - EPSILON, p.z)).dist,
-        scene(vec3(p.x, p.y, p.z - EPSILON)).dist
     );
   return normalize(n1 - d);
 }
@@ -226,55 +161,58 @@ float softshadow(in vec3 ro, in vec3 rd, float k)
 
     // cone
     result = min( result, k*dist/t );
-	  t += max(dist*0.5, 0.1);
-    if( dist< 0.0001 ) break;
+	t += dist*0.99;
+    if( dist< EPSILON ) break;
   }
   return clamp(result,0.0,1.0);
 }
 
 void main() {
 	// doo some ray march ing
-
+	
 	float aspectRatio = res.y / res.x;
 	vec2 coords = vuv * 2.0 - 1.0;
 	coords.x *= 2.0;
-
+	
 	// use the actual scene camera transform to rotate/translate the ray origin/dir
 	vec3 rayOrigin = (camera * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
 	vec3 rayDirection = (camera * vec4(normalize(vec3(coords, -1.0)), 0.0)).xyz;
-
+	
 	float minStep = 0.1;
-	mat distance = mat(0.0, vec3(0.0));
-  float t = 0.5;
-
+	mat distance = mat(0., vec3(0.0));
+	float t = 0.5;
+	
 	for(int i=0; i<MAX_STEPS; i++) {
 		distance = scene(rayOrigin + t * rayDirection);
-		if(distance.dist < minStep) {
+		if(abs(distance.dist) <= EPSILON) {
 			break;
 		}
-    t += distance.dist * 0.2;
+		t += distance.dist * 0.9;
 	}
-
-  vec3 currentPos = rayOrigin + t * rayDirection;
-
+	
+	vec3 currentPos = rayOrigin + t * rayDirection;
+	
 	// alternative var to write to for depth
+	// TODO: this is not correct: http://iquilezles.org/www/articles/raypolys/raypolys.htm
 	gl_FragDepthEXT = t;
-
-	if(distance.dist > 1.0) {
+	
+	if(distance.dist > EPSILON) {
 		gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
 		return;
 	}
-
+	
 	vec3 normal = getNormal(currentPos, distance.dist);
 	vec3 color = distance.color;
 	vec3 lightColor = vec3(0.8, 0.88, 0.8);
 	vec3 lightPos = normalize(vec3(1.0, 1.0, 2.0));
 	vec3 reflectAngle = reflect(rayDirection, normal);
-  float attenuation = 1.0 / (1.0 + 0.0002*pow( length(currentPos - rayOrigin), 2.0));
+	float attenuation = 1.0 / (1.0 + 0.00002*pow( length(currentPos - rayOrigin), 3.0));
+	
 	float diffComp = diffuse(normal, lightPos, 1.0) * attenuation;
 	float specComp = specular(reflectAngle, lightPos, 2.0) * attenuation;
 	float ambient = 0.2;
-	float shadow = softshadow(currentPos + 0.1 * normal, lightPos, 32.0);
-
+	float shadow = softshadow(currentPos + 0.001 * normal, lightPos, 16.0);
+	
+	
 	gl_FragColor = vec4(color * clamp(max(diffComp,ambient), 0.0, 1.0) * clamp(max(shadow,ambient), 0.0, 1.0) + lightColor * specComp * shadow / 3.0, 1.0);
 }

@@ -7,8 +7,9 @@ define(function(require) {
 	*/
 	var terrain = function(actualCamera) {
 
-		this.material = shader('shaders/terrain');
-		this.material.uniforms.res = {type: '2f', value: new THREE.Vector2(window.innerWidth*.8, window.innerHeight*.8) };
+		this.material = shader('shaders/terrain.vertex', 'shaders/terrain_ruins.fragment');
+		//this.material.uniforms.res = {type: '2f', value: new THREE.Vector2(window.innerWidth, window.innerHeight) };
+		console.log(this.material.uniforms.res);
 
 		this.camera = new THREE.OrthographicCamera( -1, 1, 1, -1, 0, 1 );
 		this.scene  = new THREE.Scene();

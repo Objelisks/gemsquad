@@ -25,7 +25,6 @@ define(function(require) {
 
 		var dialogue = function(target) {
 			component.call(this, 'dialogue', target);
-			console.log(seq);
 
 			this.seqIndex = 0;
 

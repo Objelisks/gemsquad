@@ -43,12 +43,12 @@ define(function(require) {
 
 			world.terrain = new terrain(world.camera);
 
-			var p1 = new entity().of([input, player, camera, networked.sender]);
+			var p1 = new entity().of([input, camera, networked.sender]);
 			world.addUpdate(p1);
 			world.player = p1;
 
-			var gem1 = new entity().of([gem, physicsController]);
-			world.addUpdate(gem1);
+			//var gem1 = new entity().of([gem, physicsController]);
+			//world.addUpdate(gem1);
 
 			var textTest = new entity().of([dialogue(dialogue.intro)]);
 			textTest.position.y -= 2;

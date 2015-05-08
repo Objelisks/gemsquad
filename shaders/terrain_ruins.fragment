@@ -1,0 +1,173 @@
+uniform mat4 camera;
+varying vec2 vuv;
+uniform float time;
+uniform float korg[8];
+uniform vec2 res;
+
+const int MAX_STEPS = 100;
+const float EPSILON = 0.001;
+const float PI = 3.14159;
+
+struct material {
+	vec3 albedo;
+	vec4 specular;
+};
+
+struct scenePoint {
+	float d;
+	material mat;
+};
+
+vec3 cameraOffset() {
+	return vec3(camera[3].x, camera[3].y, camera[3].z);
+}
+
+float u(float a, float b) {
+	return min(a, b);
+}
+
+float smin( float a, float b, float k )
+{
+    float h = clamp( 0.5+0.5*(b-a)/k, 0.0, 1.0 );
+    return mix( b, a, h ) - k*h*(1.0-h);
+}
+
+float sphere(vec3 p, vec3 c, float r) {
+	return length(p - c) - r;
+}
+
+float terrain(vec3 p) {
+	vec3 q = mod(p+15.0, 30.0)-15.0;
+	return p.y + -smin(-10.0 + length(q.xz), 0.0, 0.9);
+}
+
+material terrain_color(vec3 p) {
+	//return material(vec3(0.73, 0.64, 0.59), vec4(vec3(0.90), 0.8));
+	return material(vec3(0.33, 0.24, 0.19), vec4(vec3(0.05), 0.2));
+}
+
+float scene_dist(vec3 p) {
+	return u(terrain(p),
+		u(sphere(p, vec3(0.0, 1.0, 0.0), 2.0),
+		sphere(p, vec3(5.0, 2.0, 0.0), 2.0)
+		));
+}
+
+float light_dist(vec3 p) {
+	return sphere(p, vec3(0.0, -8.0+sin(time), -20.0) + cameraOffset(), 0.2);
+}
+
+material scene_color(vec3 p) {
+	return terrain_color(p);
+}
+
+scenePoint scene(vec3 p) {
+	return scenePoint(u(scene_dist(p), light_dist(p)), scene_color(p));
+}
+
+vec3 getNormal(vec3 p, float d) {
+	vec3 n1 = vec3(
+        scene_dist(vec3(p.x + EPSILON, p.y, p.z)),
+        scene_dist(vec3(p.x, p.y + EPSILON, p.z)),
+        scene_dist(vec3(p.x, p.y, p.z + EPSILON))
+    );
+  return normalize(n1 - d);
+}
+
+vec3 light(vec3 diffuse, vec3 normalVector, vec3 lightVector, vec3 lightColor, vec3 ray, material mat) {
+	vec3 halfVector = (lightVector + ray) / normalize(lightVector + ray);
+	
+	// microfacet distribution (normalized)
+	float D = (((1.0 - mat.specular.a)+2.0) / (2.0 * PI)) * pow(max(dot(normalVector, normalVector), 0.0), (1.0 - mat.specular.a));
+	
+	// fresnel component
+	vec3 F = mat.specular.xyz + (1.0 - mat.specular.xyz) * pow(1.0 - max(dot(lightVector, normalVector), 0.0), 5.0);
+	vec3 brdf = D * F; 
+	
+	return PI * (diffuse + brdf) * (lightColor * max(dot(normalVector, lightVector), 0.0));
+}
+
+float softShadow(in vec3 shadingPos, in vec3 lightVector, in vec3 lightPos )
+{
+    // real shadows	
+    float penumbra = 1.0;
+    float t = EPSILON;
+	float dist = length(lightPos - shadingPos);
+	
+	for( int i=0; i<48; i++ )
+	{
+	    vec3  p = shadingPos + t * lightVector;
+        float h = scene_dist(p);
+		penumbra = min(penumbra, 16.0 * h / t);
+		t += h;
+		if(penumbra < 0.0001 || t >= dist) break;
+	}
+	return 1.0 - clamp(penumbra, 0.0, 1.0);
+}
+
+void main() {
+	float aspectRatio = res.y / res.x;
+	vec2 coords = (vuv * 2.0 - 1.0) / 2.0;
+	coords.x /= aspectRatio;
+	
+	vec3 rayOrigin = (camera * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+	vec3 rayDirection = (camera * vec4(normalize(vec3(coords, -1.0)), 0.0)).xyz;
+	
+	scenePoint distance;
+	float t = 0.5;
+	float distCone = 0.9;
+	vec3 currentPos = vec3(0.);
+	
+	for(int i=0; i<MAX_STEPS; i++) {
+		currentPos = rayOrigin + t * rayDirection;
+		distance = scene(currentPos);
+		if(abs(distance.d) < EPSILON) {
+			break;
+		}
+		t += distance.d * distCone;
+	}
+	
+	//gl_FragDepthEXT
+	gl_FragColor = vec4(vec3(0.0), 1.0);
+	
+	// did not hit any objects
+	// TODO: try this with EPSILON
+	if(distance.d > 0.1) {
+		return;
+	}
+	
+	// lights
+	// diffuse
+	// specular
+	// attenuation
+	// fog
+	// shadow
+	// ambient + occlusion
+	// gamma correction
+	
+	material mat = distance.mat;
+	
+	vec3 lightPos = vec3(0.0, -8.0 + sin(time), -20.0) + cameraOffset();
+	vec3 light1Vector = normalize(lightPos - currentPos);
+	vec3 light1Color = vec3(1.0);
+	
+	vec3 light2Vector = normalize(vec3(0.0, 1.0, 0.0));
+	vec3 light2Color = vec3(0.6);
+	
+	vec3 viewVector = normalize(rayOrigin - currentPos);
+	vec3 normalVector = getNormal(currentPos, distance.d);
+	
+	vec3 diffuse = mat.albedo / PI;
+	
+	vec3 light1 = light(diffuse, normalVector, light1Vector, light1Color, viewVector, mat) - softShadow(currentPos + normalVector, light1Vector, lightPos);
+	vec3 light2 = light(diffuse, normalVector, light2Vector, light2Color, viewVector, mat) - softShadow(currentPos + normalVector, light2Vector, vec3(0.0, 100000.0, 0.0));
+	light1 = clamp(light1, 0.0, 1.0);
+	light2 = clamp(light2, 0.0, 1.0);
+	
+	vec3 ambient = vec3(0.4) * PI;
+	
+	
+	vec3 color = clamp(light1 + light2, 0.0, 1.0) + ambient * diffuse;
+	
+	gl_FragColor = vec4(color, 1.0);
+}

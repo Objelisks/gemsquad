@@ -8,7 +8,7 @@ define(function(require) {
 	var initNetwork = false;
 
 	// TODO: self hosted server
-	var peerjs = new Peer({key: '2yoxnlq8h0k9'});
+	var peerjs = initNetwork ? null : new Peer({key: '2yoxnlq8h0k9'});
 
 	/*
 		Send a message packet to the server and optionally handle the response with a callback.
