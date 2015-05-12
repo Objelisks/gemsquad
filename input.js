@@ -2,7 +2,7 @@ define(function(require) {
 	var component = require('component');
 	var keys = new THREEx.KeyboardState();
 
-	var moveSpeed = 10.0;
+	var moveSpeed = 100.0;
 	var clock = new THREE.Clock();
 
 	/*
@@ -31,6 +31,13 @@ define(function(require) {
 		}
 		if(keys.pressed('right')) {
 			this.target.position.x += moveSpeed * delta;
+		}
+
+		if(keys.pressed('q')) {
+			this.target.position.y += moveSpeed * delta;
+		}
+		if(keys.pressed('a')) {
+			this.target.position.y -= moveSpeed * delta;
 		}
 	}
 

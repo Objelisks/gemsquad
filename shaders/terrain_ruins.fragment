@@ -22,6 +22,44 @@ vec3 cameraOffset() {
 	return vec3(camera[3].x, camera[3].y, camera[3].z);
 }
 
+vec2 hash(vec2 p) {
+	return fract(sin(vec2(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3))))*43758.5453);
+}
+
+vec3 hash3( vec2 p )
+{
+    vec3 q = vec3( dot(p,vec2(127.1,311.7)), 
+				   dot(p,vec2(269.5,183.3)), 
+				   dot(p,vec2(419.2,371.9)) );
+	return fract(sin(q)*43758.5453);
+}
+
+float iqnoise( in vec2 x )
+{
+    vec2 p = floor(x);
+    vec2 f = fract(x);
+		
+	float k = 24.; // 64.
+	
+	float va = 0.0;
+	float wt = 0.0;
+    for( int j=-1; j<=1; j++ )
+    for( int i=-1; i<=1; i++ )
+    {
+        vec2 g = vec2( float(i),float(j) );
+		vec3 o = hash3( p + g );
+		vec2 r = g - f + o.xy;
+		float d = dot(r,r);
+		float ww = pow( abs(1.0-smoothstep(0.0,1.414,sqrt(d))), k );
+		va += o.z*ww;
+		wt += ww;
+    }
+	
+    return va/wt;
+}
+
+
+
 float u(float a, float b) {
 	return min(a, b);
 }
@@ -36,19 +74,45 @@ float sphere(vec3 p, vec3 c, float r) {
 	return length(p - c) - r;
 }
 
+float sdCappedCylinder( vec3 p, vec2 h )
+{
+  vec2 d = abs(vec2(length(p.xz),p.y)) - h;
+  return min(max(d.x,d.y),0.0) + length(max(d,0.0));
+}
+
+float stepped_cylamid(vec3 p, vec3 c, vec2 h) {
+	float m = sdCappedCylinder(p-c, h);
+	for(float i = 8.; i > 0.; i-= 1.) {
+		c += vec3(0., h.y, 0.);
+		h -= vec2(h.x/8., 0.0);
+		m = min(m, sdCappedCylinder(p-c, h));
+	}
+	return m;
+}
+
+float towers(vec3 p) {
+	vec3 q = vec3(mod(p.xz, 800.) - 400., p.y).xzy;
+	vec2 off = hash(floor(p.xz/800.)*800.)*600.-300.;
+	return stepped_cylamid(q, vec3(off.x, 0.0, off.y), vec2(100.0, 20.0));
+}
+
+
 float terrain(vec3 p) {
-	vec3 q = mod(p+15.0, 30.0)-15.0;
-	return p.y + -smin(-10.0 + length(q.xz), 0.0, 0.9);
+	return p.y;
 }
 
 material terrain_color(vec3 p) {
 	//return material(vec3(0.73, 0.64, 0.59), vec4(vec3(0.90), 0.8));
-	return material(vec3(0.33, 0.24, 0.19), vec4(vec3(0.05), 0.2));
+
+	//float v = iqnoise(p.xz*50.0*korg[0]);
+	vec2 off = hash(floor(p.xz/800.)*800.);
+	//return material(vec3(0.33, 0.24, 0.19), vec4(vec3(0.05), 0.2));
+	return material(vec3(off, 0.19), vec4(vec3(0.05), 0.2));
 }
 
 float scene_dist(vec3 p) {
 	return u(terrain(p),
-		u(sphere(p, vec3(0.0, 1.0, 0.0), 2.0),
+		u(towers(p),
 		sphere(p, vec3(5.0, 2.0, 0.0), 2.0)
 		));
 }
@@ -87,7 +151,24 @@ vec3 light(vec3 diffuse, vec3 normalVector, vec3 lightVector, vec3 lightColor, v
 	return PI * (diffuse + brdf) * (lightColor * max(dot(normalVector, lightVector), 0.0));
 }
 
-float softShadow(in vec3 shadingPos, in vec3 lightVector, in vec3 lightPos )
+float softShadow_dir(in vec3 shadingPos, in vec3 lightVector )
+{
+    // real shadows	
+    float penumbra = 1.0;
+    float t = 0.1;
+	
+	for( int i=0; i<48; i++ )
+	{
+	    vec3  p = shadingPos + t * lightVector;
+        float h = scene_dist(p);
+		penumbra = min(penumbra, 16.0 * h / t);
+		t += h;
+		if(penumbra < 0.0001) break;
+	}
+	return 1.0 - clamp(penumbra, 0.0, 1.0);
+}
+
+float softShadow_pt(in vec3 shadingPos, in vec3 lightVector, in vec3 lightPos )
 {
     // real shadows	
     float penumbra = 1.0;
@@ -105,10 +186,22 @@ float softShadow(in vec3 shadingPos, in vec3 lightVector, in vec3 lightPos )
 	return 1.0 - clamp(penumbra, 0.0, 1.0);
 }
 
+float ambientOcclusion(vec3 p, vec3 n) {
+    float step = 8.;
+    float ao = 0.;
+    float dist;
+    for (int i = 1; i <= 3; i++) {
+        dist = step * float(i);
+		ao += max(0., (dist - scene_dist(p + n * dist)) / dist);  
+    }
+    return 1. - ao * 0.1;
+}
+
 void main() {
 	float aspectRatio = res.y / res.x;
 	vec2 coords = (vuv * 2.0 - 1.0) / 2.0;
 	coords.x /= aspectRatio;
+
 	
 	vec3 rayOrigin = (camera * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
 	vec3 rayDirection = (camera * vec4(normalize(vec3(coords, -1.0)), 0.0)).xyz;
@@ -127,11 +220,12 @@ void main() {
 		t += distance.d * distCone;
 	}
 	
+	vec3 fogColor = vec3(0.5, 0.6, 0.7);
+	
 	//gl_FragDepthEXT
-	gl_FragColor = vec4(vec3(0.0), 1.0);
+	gl_FragColor = vec4(fogColor, 1.0);
 	
 	// did not hit any objects
-	// TODO: try this with EPSILON
 	if(distance.d > 0.1) {
 		return;
 	}
@@ -150,24 +244,33 @@ void main() {
 	vec3 lightPos = vec3(0.0, -8.0 + sin(time), -20.0) + cameraOffset();
 	vec3 light1Vector = normalize(lightPos - currentPos);
 	vec3 light1Color = vec3(1.0);
+	float light1Intensity = 500.0;
 	
-	vec3 light2Vector = normalize(vec3(0.0, 1.0, 0.0));
-	vec3 light2Color = vec3(0.6);
+	vec3 light2Vector = normalize(vec3(0.5, 1.0, 0.0));
+	vec3 light2Color = vec3(1.0);
+	float light2Intensity = 1.0;
 	
 	vec3 viewVector = normalize(rayOrigin - currentPos);
 	vec3 normalVector = getNormal(currentPos, distance.d);
 	
 	vec3 diffuse = mat.albedo / PI;
 	
-	vec3 light1 = light(diffuse, normalVector, light1Vector, light1Color, viewVector, mat) - softShadow(currentPos + normalVector, light1Vector, lightPos);
-	vec3 light2 = light(diffuse, normalVector, light2Vector, light2Color, viewVector, mat) - softShadow(currentPos + normalVector, light2Vector, vec3(0.0, 100000.0, 0.0));
-	light1 = clamp(light1, 0.0, 1.0);
-	light2 = clamp(light2, 0.0, 1.0);
+	vec3 light1 = light(diffuse, normalVector, light1Vector, light1Color, viewVector, mat) - softShadow_pt(currentPos + normalVector*0.2, light1Vector, lightPos);
+	vec3 light2 = light(diffuse, normalVector, light2Vector, light2Color, viewVector, mat) - softShadow_dir(currentPos + normalVector*0.2, light2Vector);
+	light1 = clamp(light1*light1Intensity / (t*t), 0.0, 1.0);
+	light2 = clamp(light2*light2Intensity, 0.0, 1.0);
 	
-	vec3 ambient = vec3(0.4) * PI;
+	vec3 ambient = vec3(0.7) * PI * ambientOcclusion(currentPos, normalVector);
 	
+	vec3 color = light1 + light2 + ambient * diffuse;
 	
-	vec3 color = clamp(light1 + light2, 0.0, 1.0) + ambient * diffuse;
+	// fog
 	
-	gl_FragColor = vec4(color, 1.0);
+	float fogStart = 100.0;
+	float fogRamp = 0.01;
+	float fogAmount = clamp(1.0 - exp((-t+fogStart)*fogRamp), 0.0, 1.0);
+	
+	//color = mix(color, fogColor, fogAmount);
+	
+	gl_FragColor = vec4(color, fogAmount);
 }
