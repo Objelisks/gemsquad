@@ -50,9 +50,9 @@ define(function(require) {
 			//var gem1 = new entity().of([gem, physicsController]);
 			//world.addUpdate(gem1);
 
-			var textTest = new entity().of([dialogue(dialogue.intro)]);
-			textTest.position.y -= 2;
-			world.add(textTest);
+			//var textTest = new entity().of([dialogue(dialogue.intro)]);
+			//textTest.position.y -= 2;
+			//world.add(textTest);
 
 		}
 	};

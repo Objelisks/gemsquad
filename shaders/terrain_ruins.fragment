@@ -1,10 +1,15 @@
+
+#extension GL_EXT_frag_depth : enable
+
 uniform mat4 camera;
 varying vec2 vuv;
 uniform float time;
 uniform float korg[8];
 uniform vec2 res;
+uniform int isTransition;
 
 const int MAX_STEPS = 100;
+const int MAX_PORTAL_STEPS = 5;
 const float EPSILON = 0.001;
 const float PI = 3.14159;
 
@@ -64,6 +69,10 @@ float u(float a, float b) {
 	return min(a, b);
 }
 
+float d(float a, float b) {
+	return max(a, -b);
+}
+
 float smin( float a, float b, float k )
 {
     float h = clamp( 0.5+0.5*(b-a)/k, 0.0, 1.0 );
@@ -91,35 +100,44 @@ float stepped_cylamid(vec3 p, vec3 c, vec2 h) {
 }
 
 float towers(vec3 p) {
-	vec3 q = vec3(mod(p.xz, 800.) - 400., p.y).xzy;
+	vec3 q = vec3(mod(p.xz, 800.) - 400., -p.y).xzy;
 	vec2 off = hash(floor(p.xz/800.)*800.)*600.-300.;
 	return stepped_cylamid(q, vec3(off.x, 0.0, off.y), vec2(100.0, 20.0));
 }
 
 
 float terrain(vec3 p) {
-	return p.y;
+	return p.y + sin(length((p.xz+200.)/20.))*3.0;
 }
 
 material terrain_color(vec3 p) {
 	//return material(vec3(0.73, 0.64, 0.59), vec4(vec3(0.90), 0.8));
 
 	//float v = iqnoise(p.xz*50.0*korg[0]);
-	vec2 off = hash(floor(p.xz/800.)*800.);
-	//return material(vec3(0.33, 0.24, 0.19), vec4(vec3(0.05), 0.2));
-	return material(vec3(off, 0.19), vec4(vec3(0.05), 0.2));
+	//vec2 off = hash(floor(p.xz/800.)*800.);
+	return material(vec3(0.33, 0.24, 0.19), vec4(vec3(0.05), 0.2));
+	//return material(vec3(off, 0.19), vec4(vec3(0.05), 0.2));
 }
 
 float scene_dist(vec3 p) {
-	return u(terrain(p),
-		u(towers(p),
-		sphere(p, vec3(5.0, 2.0, 0.0), 2.0)
-		));
+	return u( 
+				d(terrain(p), towers(p)),
+				u(sphere(p, vec3(0.0, 0.0, 0.0), 1.0),
+				u(sphere(p, vec3(0.0, 1.0, 15.0), 4.0),
+				sphere(p, vec3(0.0, 1.0, -15.0), 4.0)
+				))
+			);
 }
 
 float light_dist(vec3 p) {
 	return sphere(p, vec3(0.0, -8.0+sin(time), -20.0) + cameraOffset(), 0.2);
 }
+
+float portal_dist(vec3 p) {
+	return sphere(p, vec3(0.0, 0.0, 0.0), 10.0);
+}
+
+const vec3 fogColor = vec3(0.5, 0.55, 0.5);
 
 material scene_color(vec3 p) {
 	return terrain_color(p);
@@ -206,27 +224,45 @@ void main() {
 	vec3 rayOrigin = (camera * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
 	vec3 rayDirection = (camera * vec4(normalize(vec3(coords, -1.0)), 0.0)).xyz;
 	
-	scenePoint distance;
+	scenePoint pt;
 	float t = 0.5;
-	float distCone = 0.9;
-	vec3 currentPos = vec3(0.);
+	float distance;
+	float distCone = 0.99;
+	vec3 currentPos;
+	
+	for(int i=0; i<MAX_PORTAL_STEPS; i++) {
+		currentPos = rayOrigin + t * rayDirection;
+		distance = portal_dist(currentPos);
+		if(abs(distance) < 0.1) {
+			break;
+		}
+		t += distance * distCone;
+	}
+	
+	float portalDist = distance;
+	float portalDepth = t;
+	t = 0.5;
 	
 	for(int i=0; i<MAX_STEPS; i++) {
 		currentPos = rayOrigin + t * rayDirection;
-		distance = scene(currentPos);
-		if(abs(distance.d) < EPSILON) {
+		pt = scene(currentPos);
+		if(abs(pt.d) < 0.1) {
 			break;
 		}
-		t += distance.d * distCone;
+		t += pt.d * distCone;
 	}
 	
-	vec3 fogColor = vec3(0.5, 0.6, 0.7);
+	// scissor everything but portal area if this is a transition scene
+	// scissor portal area if main scene
+	if(((isTransition == 1) != (portalDist < 0.1)) && portalDepth < t) {
+		discard;
+	}
 	
-	//gl_FragDepthEXT
+	gl_FragDepthEXT = isTransition == 1 ? 1000.0 : 0.0;
 	gl_FragColor = vec4(fogColor, 1.0);
 	
-	// did not hit any objects
-	if(distance.d > 0.1) {
+	// did not hit any objects, use fog
+	if(pt.d > 0.1) {
 		return;
 	}
 	
@@ -239,7 +275,7 @@ void main() {
 	// ambient + occlusion
 	// gamma correction
 	
-	material mat = distance.mat;
+	material mat = pt.mat;
 	
 	vec3 lightPos = vec3(0.0, -8.0 + sin(time), -20.0) + cameraOffset();
 	vec3 light1Vector = normalize(lightPos - currentPos);
@@ -251,7 +287,7 @@ void main() {
 	float light2Intensity = 1.0;
 	
 	vec3 viewVector = normalize(rayOrigin - currentPos);
-	vec3 normalVector = getNormal(currentPos, distance.d);
+	vec3 normalVector = getNormal(currentPos, pt.d);
 	
 	vec3 diffuse = mat.albedo / PI;
 	
@@ -267,10 +303,10 @@ void main() {
 	// fog
 	
 	float fogStart = 100.0;
-	float fogRamp = 0.01;
+	float fogRamp = 0.005;
 	float fogAmount = clamp(1.0 - exp((-t+fogStart)*fogRamp), 0.0, 1.0);
 	
-	//color = mix(color, fogColor, fogAmount);
+	color = mix(color, fogColor, fogAmount);
 	
 	gl_FragColor = vec4(color, fogAmount);
 }

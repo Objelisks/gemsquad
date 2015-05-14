@@ -7,8 +7,11 @@ define(function(require) {
 	*/
 	var terrain = function(actualCamera) {
 
-		this.material = shader('shaders/terrain.vertex', 'shaders/terrain_ruins.fragment');
+		this.material = shader('shaders/terrain.vertex', 'shaders/terrain_islands.fragment');
+		this.transitionMaterial = shader('shaders/terrain.vertex', 'shaders/terrain_ruins.fragment');
 		//this.material.uniforms.res = {type: '2f', value: new THREE.Vector2(window.innerWidth, window.innerHeight) };
+		this.material.uniforms.isTransition = {type: 'i', value: 0 };
+		this.transitionMaterial.uniforms.isTransition = {type: 'i', value: 1 };
 		console.log(this.material.uniforms.res);
 
 		this.camera = new THREE.OrthographicCamera( -1, 1, 1, -1, 0, 1 );
@@ -80,6 +83,14 @@ define(function(require) {
 	}
 
 	terrain.prototype.render = function(renderer) {
+		// render main
+		this.quad.material = this.material;
+		this.quad.material.uniforms.isTransition.value = 0;
+		renderer.render(this.scene, this.camera);
+		
+		// render transition
+		this.quad.material = this.transitionMaterial;
+		this.quad.material.uniforms.isTransition.value = 1;
 		renderer.render(this.scene, this.camera);
 	}
 

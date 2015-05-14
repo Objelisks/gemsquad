@@ -1,0 +1,305 @@
+
+#extension GL_EXT_frag_depth : enable
+
+uniform mat4 camera;
+varying vec2 vuv;
+uniform float time;
+uniform float korg[8];
+uniform vec2 res;
+uniform int isTransition;
+
+const int MAX_STEPS = 100;
+const int MAX_PORTAL_STEPS = 5;
+const float EPSILON = 0.001;
+const float PI = 3.14159;
+
+struct material {
+	vec3 albedo;
+	vec4 specular;
+};
+
+struct scenePoint {
+	float d;
+	material mat;
+};
+
+vec3 cameraOffset() {
+	return vec3(camera[3].x, camera[3].y, camera[3].z);
+}
+
+vec2 hash(vec2 p) {
+	return fract(sin(vec2(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3))))*43758.5453);
+}
+
+vec3 hash3( vec2 p )
+{
+    vec3 q = vec3( dot(p,vec2(127.1,311.7)), 
+				   dot(p,vec2(269.5,183.3)), 
+				   dot(p,vec2(419.2,371.9)) );
+	return fract(sin(q)*43758.5453);
+}
+
+float iqnoise( in vec2 x )
+{
+    vec2 p = floor(x);
+    vec2 f = fract(x);
+		
+	float k = 24.; // 64.
+	
+	float va = 0.0;
+	float wt = 0.0;
+    for( int j=-1; j<=1; j++ )
+    for( int i=-1; i<=1; i++ )
+    {
+        vec2 g = vec2( float(i),float(j) );
+		vec3 o = hash3( p + g );
+		vec2 r = g - f + o.xy;
+		float d = dot(r,r);
+		float ww = pow( abs(1.0-smoothstep(0.0,1.414,sqrt(d))), k );
+		va += o.z*ww;
+		wt += ww;
+    }
+	
+    return va/wt;
+}
+
+
+float u(float a, float b) {
+	return min(a, b);
+}
+
+float d(float a, float b) {
+	return max(a, -b);
+}
+
+float smin( float a, float b, float k )
+{
+    float h = clamp( 0.5+0.5*(b-a)/k, 0.0, 1.0 );
+    return mix( b, a, h ) - k*h*(1.0-h);
+}
+
+
+// end common
+
+// start distance functions
+
+
+float sphere(vec3 p, vec3 c, float r) {
+	return length(p - c) - r;
+}
+
+
+float terrain(vec3 p) {
+	return p.y + sin(length((p.xz+200.)/20.))*3.0;
+}
+
+
+float scene_dist(vec3 p) {
+	return terrain(p);
+}
+
+float light_dist(vec3 p) {
+	return sphere(p, vec3(0.0, -8.0+sin(time), -20.0) + cameraOffset(), 0.2);
+}
+
+float portal_dist(vec3 p) {
+	return sphere(p, vec3(0.0, 0.0, 0.0), 10.0);
+}
+
+
+// end distance functions
+
+// start colors
+
+
+const vec3 fogColor = vec3(0.5, 0.55, 0.5);
+
+material terrain_color(vec3 p) {
+	//return material(vec3(0.2, 0.15, 0.1), vec4(vec3(0.05), 0.2));
+	return material(vec3(0.25, 0.15, 0.3), vec4(vec3(0.05), 0.2));
+}
+
+material scene_color(vec3 p) {
+	return terrain_color(p);
+}
+
+
+// end colors
+
+// start scene
+
+
+scenePoint scene(vec3 p) {
+	return scenePoint(u(scene_dist(p), light_dist(p)), scene_color(p));
+}
+
+
+// end scene
+
+// start rendering stuff
+
+
+vec3 getNormal(vec3 p, float d) {
+	vec3 n1 = vec3(
+        scene_dist(vec3(p.x + EPSILON, p.y, p.z)),
+        scene_dist(vec3(p.x, p.y + EPSILON, p.z)),
+        scene_dist(vec3(p.x, p.y, p.z + EPSILON))
+    );
+  return normalize(n1 - d);
+}
+
+vec3 light(material mat, vec3 normalVector, vec3 lightVector, vec3 lightColor, vec3 ray) {
+	vec3 halfVector = (lightVector + ray) / normalize(lightVector + ray);
+	
+	// microfacet distribution (normalized)
+	float D = (((1.0 - mat.specular.a)+2.0) / (2.0 * PI)) * pow(max(dot(normalVector, normalVector), 0.0), (1.0 - mat.specular.a));
+	
+	// fresnel component
+	vec3 F = mat.specular.xyz + (1.0 - mat.specular.xyz) * pow(1.0 - max(dot(lightVector, normalVector), 0.0), 5.0);
+	vec3 brdf = D * F; 
+	
+	return (mat.albedo + PI * brdf) * (lightColor * max(dot(normalVector, lightVector), 0.0));
+}
+
+float softShadow_dir(in vec3 shadingPos, in vec3 lightVector )
+{
+    // real shadows	
+    float penumbra = 1.0;
+    float t = 0.1;
+	
+	for( int i=0; i<48; i++ )
+	{
+	    vec3  p = shadingPos + t * lightVector;
+        float h = scene_dist(p);
+		penumbra = min(penumbra, 16.0 * h / t);
+		t += h;
+		if(penumbra < 0.0001) break;
+	}
+	return 1.0 - clamp(penumbra, 0.0, 1.0);
+}
+
+float softShadow_pt(in vec3 shadingPos, in vec3 lightVector, in vec3 lightPos )
+{
+    // real shadows	
+    float penumbra = 1.0;
+    float t = EPSILON;
+	float dist = length(lightPos - shadingPos);
+	
+	for( int i=0; i<48; i++ )
+	{
+	    vec3  p = shadingPos + t * lightVector;
+        float h = scene_dist(p);
+		penumbra = min(penumbra, 16.0 * h / t);
+		t += h;
+		if(penumbra < 0.0001 || t >= dist) break;
+	}
+	return 1.0 - clamp(penumbra, 0.0, 1.0);
+}
+
+float ambientOcclusion(vec3 p, vec3 n) {
+    float step = 8.;
+    float ao = 0.;
+    float dist;
+    for (int i = 1; i <= 3; i++) {
+        dist = step * float(i);
+		ao += max(0., (dist - scene_dist(p + n * dist)) / dist);  
+    }
+    return 1. - ao * 0.1;
+}
+
+void main() {
+	float aspectRatio = res.y / res.x;
+	vec2 coords = (vuv * 2.0 - 1.0) / 2.0;
+	coords.x /= aspectRatio;
+
+	
+	vec3 rayOrigin = (camera * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+	vec3 rayDirection = (camera * vec4(normalize(vec3(coords, -1.0)), 0.0)).xyz;
+	
+	scenePoint pt;
+	float t = 0.5;
+	float distance;
+	float distCone = 0.99;
+	vec3 currentPos;
+	
+	for(int i=0; i<MAX_PORTAL_STEPS; i++) {
+		currentPos = rayOrigin + t * rayDirection;
+		distance = portal_dist(currentPos);
+		if(abs(distance) < 0.1) {
+			break;
+		}
+		t += distance * distCone;
+	}
+	
+	float portalDist = distance;
+	float portalDepth = t;
+	t = 0.5;
+	
+	for(int i=0; i<MAX_STEPS; i++) {
+		currentPos = rayOrigin + t * rayDirection;
+		pt = scene(currentPos);
+		if(abs(pt.d) < 0.1) {
+			break;
+		}
+		t += pt.d * distCone;
+	}
+	
+	// scissor everything but portal area if this is a transition scene
+	// scissor portal area if main scene
+	if((isTransition == 1) != (portalDist < 0.1)) {
+		discard;
+	}
+	
+	gl_FragDepthEXT = isTransition == 1 ? 1000.0 : 0.0;
+	gl_FragColor = vec4(fogColor, 1.0);
+	
+	// did not hit any objects, use fog
+	if(pt.d > 0.1) {
+		return;
+	}
+	
+
+	// important vectors
+
+	vec3 viewVector = normalize(rayOrigin - currentPos);
+	vec3 normalVector = getNormal(currentPos, pt.d);
+
+
+	// material
+
+	material mat = pt.mat;
+	vec3 diffuse = mat.albedo / PI;
+
+
+	// lighting
+
+	vec3 lightPos = vec3(0.0, -8.0 + sin(time), -20.0) + cameraOffset();
+	vec3 light1Vector = normalize(lightPos - currentPos);
+	vec3 light1Color = vec3(1.0);
+	float light1Intensity = 500.0;
+	
+	vec3 light2Vector = normalize(vec3(0.5, 1.0, 0.0));
+	vec3 light2Color = vec3(1.0);
+	float light2Intensity = 1.0;
+	
+	vec3 light1 = light(mat, normalVector, light1Vector, light1Color, viewVector) - softShadow_pt(currentPos + normalVector*0.2, light1Vector, lightPos);
+	vec3 light2 = light(mat, normalVector, light2Vector, light2Color, viewVector) - softShadow_dir(currentPos + normalVector*0.2, light2Vector);
+	light1 = clamp(light1*light1Intensity / (t*t), 0.0, 1.0); // distance squared attenuation
+	light2 = clamp(light2*light2Intensity, 0.0, 1.0); // no attenuation
+	
+	vec3 ambient = vec3(0.7) * PI * ambientOcclusion(currentPos, normalVector);
+	
+
+	vec3 color = light1 + light2 + ambient * diffuse;
+	
+	// fog
+	
+	float fogStart = 100.0;
+	float fogRamp = 0.005;
+	float fogAmount = clamp(1.0 - exp((-t+fogStart)*fogRamp), 0.0, 1.0);
+	
+	color = mix(color, fogColor, fogAmount);
+	
+	// the end
+	gl_FragColor = vec4(color, fogAmount);
+}
